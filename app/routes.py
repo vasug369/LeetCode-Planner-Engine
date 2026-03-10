@@ -1,6 +1,6 @@
 """FastAPI API routes and dashboard serving."""
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from datetime import date, datetime
@@ -200,30 +200,36 @@ def register_routes(app: FastAPI):
 
     @app.get("/api/cron/sync")
     @app.post("/api/cron/sync")
-    async def cron_sync(request: Request):
+    async def cron_sync(request: Request, background_tasks: BackgroundTasks):
         verify_cron_secret(request)
-        db = get_db()
-        try:
-            result = sync_leetcode_progress(db)
-            return {"status": "success", "message": "Cron sync executed", "details": result}
-        finally:
-            db.close()
+        
+        def do_sync():
+            db = next(get_db())
+            try:
+                sync_leetcode_progress(db)
+            finally:
+                db.close()
+
+        background_tasks.add_task(do_sync)
+        return {"status": "success", "message": "Cron sync started in background"}
 
     @app.get("/api/cron/daily")
     @app.post("/api/cron/daily")
-    async def cron_daily(request: Request):
+    async def cron_daily(request: Request, background_tasks: BackgroundTasks):
         verify_cron_secret(request)
-        db = get_db()
-        try:
-            plan = generate_daily_plan(db, date.today())
-            summary = get_plan_summary(plan)
-            
-            if settings.EMAIL_TO and settings.SMTP_USER and settings.SMTP_PASSWORD:
-                send_daily_email(summary)
-            
-            return {"status": "success", "message": "Cron daily planner executed", "plan_size": summary["total_problems"]}
-        finally:
-            db.close()
+        
+        def do_daily_task():
+            db = next(get_db())
+            try:
+                plan = generate_daily_plan(db, date.today())
+                summary = get_plan_summary(plan)
+                if settings.EMAIL_TO and settings.SMTP_USER and settings.SMTP_PASSWORD:
+                    send_daily_email(summary)
+            finally:
+                db.close()
+
+        background_tasks.add_task(do_daily_task)
+        return {"status": "success", "message": "Cron daily planner started in background"}
 
     # ── All Problems ─────────────────────────────────────────
 
