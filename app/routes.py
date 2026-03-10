@@ -204,9 +204,13 @@ def register_routes(app: FastAPI):
         verify_cron_secret(request)
         
         def do_sync():
-            db = next(get_db())
+            print("🕒 [Cron] Starting background sync task...")
+            db = get_db()
             try:
                 sync_leetcode_progress(db)
+                print("✅ Background sync task finished.")
+            except Exception as e:
+                print(f"❌ Error in background sync task: {e}")
             finally:
                 db.close()
 
@@ -219,37 +223,21 @@ def register_routes(app: FastAPI):
         verify_cron_secret(request)
         
         def do_daily_task():
-            db = next(get_db())
+            print("🕒 [Cron] Starting background daily planner task...")
+            db = get_db()
             try:
                 plan = generate_daily_plan(db, date.today())
                 summary = get_plan_summary(plan)
+                print(f"📋 Generated plan with {summary['total_problems']} problems.")
                 if settings.EMAIL_TO and settings.SMTP_USER and settings.SMTP_PASSWORD:
                     send_daily_email(summary)
+                else:
+                    print("⚠️ Email skipped: Missing SMTP settings.")
+                print("🏁 Background daily task finished.")
+            except Exception as e:
+                print(f"❌ Error in background daily task: {e}")
             finally:
                 db.close()
 
         background_tasks.add_task(do_daily_task)
         return {"status": "success", "message": "Cron daily planner started in background"}
-
-    # ── All Problems ─────────────────────────────────────────
-
-    @app.get("/api/problems")
-    async def list_problems():
-        db = get_db()
-        try:
-            problems = get_all_problems(db)
-            items = []
-            for p in problems:
-                solved = p.progress.solved if p.progress else False
-                items.append({
-                    "id": p.id,
-                    "title": p.title,
-                    "slug": p.slug,
-                    "topic": p.topic,
-                    "difficulty": p.difficulty,
-                    "url": p.leetcode_url,
-                    "solved": solved,
-                })
-            return {"problems": items, "total": len(items)}
-        finally:
-            db.close()

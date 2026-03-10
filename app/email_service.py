@@ -102,11 +102,15 @@ def send_daily_email(plan_summary: dict) -> dict:
         msg.attach(MIMEText(html_content, "html"))
 
         # Send email
+        print(f"📧 Attempting to connect to SMTP {settings.SMTP_HOST}:{settings.SMTP_PORT}...")
         with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
             server.ehlo()
+            print("📡 Starting TLS...")
             server.starttls()
             server.ehlo()
+            print(f"🔑 Logging in as {settings.SMTP_USER}...")
             server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+            print("📤 Sending mail content...")
             server.sendmail(settings.SMTP_USER, settings.EMAIL_TO, msg.as_string())
 
         print(f"✅ Email sent to {settings.EMAIL_TO}")
