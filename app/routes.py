@@ -5,6 +5,8 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from datetime import date, datetime
 import os
+import logging
+import sys
 
 from app.database import (
     get_db, init_db, get_solved_count, get_problem_count,
@@ -21,6 +23,9 @@ from app.config import settings
 
 TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "templates")
 templates = Jinja2Templates(directory=TEMPLATE_DIR)
+
+# Setup logging
+logger = logging.getLogger("uvicorn")
 
 
 def register_routes(app: FastAPI):
@@ -204,15 +209,16 @@ def register_routes(app: FastAPI):
         verify_cron_secret(request)
         
         def do_sync():
-            print("🕒 [Cron] Starting background sync task...")
+            logger.info("🕒 [Cron] Starting background sync task...")
             db = get_db()
             try:
-                sync_leetcode_progress(db)
-                print("✅ Background sync task finished.")
+                result = sync_leetcode_progress(db)
+                logger.info(f"✅ Background sync finished: {result}")
             except Exception as e:
-                print(f"❌ Error in background sync task: {e}")
+                logger.error(f"❌ Error in background sync: {e}")
             finally:
                 db.close()
+                sys.stdout.flush()
 
         background_tasks.add_task(do_sync)
         return {"status": "success", "message": "Cron sync started in background"}
@@ -223,21 +229,23 @@ def register_routes(app: FastAPI):
         verify_cron_secret(request)
         
         def do_daily_task():
-            print("🕒 [Cron] Starting background daily planner task...")
+            logger.info("🕒 [Cron] Starting background daily planner task...")
             db = get_db()
             try:
                 plan = generate_daily_plan(db, date.today())
                 summary = get_plan_summary(plan)
-                print(f"📋 Generated plan with {summary['total_problems']} problems.")
+                logger.info(f"📋 Generated plan with {summary['total_problems']} problems.")
                 if settings.EMAIL_TO and settings.SMTP_USER and settings.SMTP_PASSWORD:
+                    logger.info(f"📧 Sending email to {settings.EMAIL_TO}...")
                     send_daily_email(summary)
                 else:
-                    print("⚠️ Email skipped: Missing SMTP settings.")
-                print("🏁 Background daily task finished.")
+                    logger.warning("⚠️ Email skipped: Missing SMTP settings in environment.")
+                logger.info("🏁 Background daily task finished successfully.")
             except Exception as e:
-                print(f"❌ Error in background daily task: {e}")
+                logger.error(f"❌ Error in background daily task: {e}")
             finally:
                 db.close()
+                sys.stdout.flush()
 
         background_tasks.add_task(do_daily_task)
         return {"status": "success", "message": "Cron daily planner started in background"}

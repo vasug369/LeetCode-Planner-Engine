@@ -10,6 +10,10 @@ import os
 
 from app.config import settings
 from app.database import get_db, get_solved_count, get_problem_count, get_current_streak
+import logging
+import sys
+
+logger = logging.getLogger("uvicorn")
 
 
 TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "templates")
@@ -102,26 +106,29 @@ def send_daily_email(plan_summary: dict) -> dict:
         msg.attach(MIMEText(html_content, "html"))
 
         # Send email
-        print(f"📧 Attempting to connect to SMTP {settings.SMTP_HOST}:{settings.SMTP_PORT}...")
+        logger.info(f"📧 Attempting to connect to SMTP {settings.SMTP_HOST}:{settings.SMTP_PORT}...")
         with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
             server.ehlo()
-            print("📡 Starting TLS...")
+            logger.info("📡 Starting TLS...")
             server.starttls()
             server.ehlo()
-            print(f"🔑 Logging in as {settings.SMTP_USER}...")
+            logger.info(f"🔑 Logging in as {settings.SMTP_USER}...")
             server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-            print("📤 Sending mail content...")
+            logger.info("📤 Sending mail content...")
             server.sendmail(settings.SMTP_USER, settings.EMAIL_TO, msg.as_string())
 
-        print(f"✅ Email sent to {settings.EMAIL_TO}")
+        logger.info(f"✅ Email sent to {settings.EMAIL_TO}")
         return {"status": "success", "message": f"Email sent to {settings.EMAIL_TO}"}
 
     except smtplib.SMTPAuthenticationError:
+        logger.error("❌ SMTP authentication failed. Check your email/password in .env")
         return {"status": "error", "message": "SMTP authentication failed. Check your email/password in .env"}
     except Exception as e:
+        logger.error(f"❌ Failed to send email: {str(e)}")
         return {"status": "error", "message": f"Failed to send email: {str(e)}"}
     finally:
         db.close()
+        sys.stdout.flush()
 
 
 if __name__ == "__main__":
