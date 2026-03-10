@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Daily LeetCode Plan</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #0f0f23; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0f0f23; padding: 20px;">
+        <tr>
+            <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border-radius: 16px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.4);">
+
+                    <!-- Header -->
+                    <tr>
+                        <td style="padding: 30px 30px 20px; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                            <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 700;">🚀 Daily LeetCode Plan</h1>
+                            <p style="color: rgba(255,255,255,0.85); margin: 8px 0 0; font-size: 14px;">{{ date }} • Striver SDE Sheet</p>
+                        </td>
+                    </tr>
+
+                    <!-- Progress Summary -->
+                    <tr>
+                        <td style="padding: 25px 30px;">
+                            <table width="100%" cellpadding="0" cellspacing="0">
+                                <tr>
+                                    <td width="50%" style="padding-right: 10px;">
+                                        <div style="background: rgba(102, 126, 234, 0.15); border: 1px solid rgba(102, 126, 234, 0.3); border-radius: 12px; padding: 15px; text-align: center;">
+                                            <p style="color: #8b9dc3; margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Progress</p>
+                                            <p style="color: #667eea; margin: 5px 0 0; font-size: 28px; font-weight: 700;">{{ solved }}/{{ total }}</p>
+                                            <p style="color: #8b9dc3; margin: 3px 0 0; font-size: 12px;">{{ progress_pct }}% complete</p>
+                                        </div>
+                                    </td>
+                                    <td width="50%" style="padding-left: 10px;">
+                                        <div style="background: rgba(118, 75, 162, 0.15); border: 1px solid rgba(118, 75, 162, 0.3); border-radius: 12px; padding: 15px; text-align: center;">
+                                            <p style="color: #8b9dc3; margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Est. Time</p>
+                                            <p style="color: #764ba2; margin: 5px 0 0; font-size: 28px; font-weight: 700;">{{ total_time }}m</p>
+                                            <p style="color: #8b9dc3; margin: 3px 0 0; font-size: 12px;">{{ total_problems }} problems</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Today's Problems -->
+                    <tr>
+                        <td style="padding: 0 30px 20px;">
+                            <h2 style="color: #e2e8f0; margin: 0 0 15px; font-size: 18px;">📋 Today's Problems</h2>
+
+                            {% for problem in problems %}
+                            <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 16px; margin-bottom: 12px;">
+                                <table width="100%" cellpadding="0" cellspacing="0">
+                                    <tr>
+                                        <td>
+                                            <span style="display: inline-block; background: {% if problem.difficulty == 'Easy' %}#00b8a3{% elif problem.difficulty == 'Medium' %}#ffc01e{% else %}#ff375f{% endif %}; color: {% if problem.difficulty == 'Medium' %}#1a1a2e{% else %}#ffffff{% endif %}; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">{{ problem.difficulty }}</span>
+                                            <span style="display: inline-block; background: rgba(102, 126, 234, 0.2); color: #667eea; padding: 3px 10px; border-radius: 20px; font-size: 11px; margin-left: 6px;">{{ problem.category }}</span>
+                                        </td>
+                                        <td style="text-align: right;">
+                                            <span style="color: #8b9dc3; font-size: 12px;">⏱ ~{{ problem.expected_time }}min</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="2" style="padding-top: 10px;">
+                                            <a href="{{ problem.url }}" style="color: #e2e8f0; text-decoration: none; font-size: 16px; font-weight: 600;">{{ problem.title }}</a>
+                                            <p style="color: #8b9dc3; margin: 4px 0 0; font-size: 13px;">{{ problem.topic }}</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+                            {% endfor %}
+                        </td>
+                    </tr>
+
+                    <!-- Motivation -->
+                    <tr>
+                        <td style="padding: 0 30px 25px;">
+                            <div style="background: linear-gradient(135deg, rgba(102, 126, 234, 0.15), rgba(118, 75, 162, 0.15)); border: 1px solid rgba(102, 126, 234, 0.2); border-radius: 12px; padding: 20px; text-align: center;">
+                                <p style="color: #e2e8f0; margin: 0; font-size: 15px; line-height: 1.5;">
+                                    {{ motivation }}
+                                </p>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="padding: 20px 30px; text-align: center; border-top: 1px solid rgba(255,255,255,0.1);">
+                            <p style="color: #4a5568; margin: 0; font-size: 12px;">
+                                LeetCode Planner Engine • Striver SDE Sheet Tracker
+                            </p>
+                        </td>
+                    </tr>
+
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
