@@ -190,6 +190,14 @@ def register_routes(app: FastAPI):
         finally:
             db.close()
 
+    # ── Health Check ─────────────────────────────────────────
+
+    @app.get("/ping")
+    @app.head("/ping")
+    async def ping():
+        """Minimal health check for cron/uptime monitors."""
+        return JSONResponse(content={"ping": "pong"}, status_code=200)
+
     # ── External Cron Endpoints (For Render/Vercel) ──────────
 
     def verify_cron_secret(req: Request):
@@ -205,6 +213,7 @@ def register_routes(app: FastAPI):
 
     @app.get("/api/cron/sync")
     @app.post("/api/cron/sync")
+    @app.head("/api/cron/sync")
     async def cron_sync(request: Request, background_tasks: BackgroundTasks):
         verify_cron_secret(request)
         
@@ -221,10 +230,11 @@ def register_routes(app: FastAPI):
                 sys.stdout.flush()
 
         background_tasks.add_task(do_sync)
-        return {"status": "success", "message": "Cron sync started in background"}
+        return JSONResponse(content={"ok": True}, status_code=202)
 
     @app.get("/api/cron/daily")
     @app.post("/api/cron/daily")
+    @app.head("/api/cron/daily")
     async def cron_daily(request: Request, background_tasks: BackgroundTasks):
         verify_cron_secret(request)
         
@@ -248,4 +258,4 @@ def register_routes(app: FastAPI):
                 sys.stdout.flush()
 
         background_tasks.add_task(do_daily_task)
-        return {"status": "success", "message": "Cron daily planner started in background"}
+        return JSONResponse(content={"ok": True}, status_code=202)
