@@ -135,18 +135,21 @@ def register_routes(app: FastAPI):
     # ── Sync LeetCode ────────────────────────────────────────
 
     @app.post("/api/sync")
-    async def sync_progress():
-        db = get_db()
-        try:
-            result = sync_leetcode_progress(db)
-            return result
-        finally:
-            db.close()
+    async def sync_progress(background_tasks: BackgroundTasks):
+        def do_sync():
+            db = get_db()
+            try:
+                sync_leetcode_progress(db)
+            finally:
+                db.close()
+        
+        background_tasks.add_task(do_sync)
+        return {"status": "success", "message": "Manual sync started in background"}
 
     # ── Send Email ───────────────────────────────────────────
 
     @app.post("/api/send-email")
-    async def trigger_email():
+    async def trigger_email(background_tasks: BackgroundTasks):
         db = get_db()
         try:
             schedule = get_schedule_for_date(db, date.today())
@@ -161,8 +164,8 @@ def register_routes(app: FastAPI):
                 ]
 
             summary = get_plan_summary(plan)
-            result = send_daily_email(summary)
-            return result
+            background_tasks.add_task(send_daily_email, summary)
+            return {"status": "success", "message": "Email triggered in background"}
         finally:
             db.close()
 

@@ -107,7 +107,7 @@ def send_daily_email(plan_summary: dict) -> dict:
 
         # Send email
         logger.info(f"📧 Attempting to connect to SMTP {settings.SMTP_HOST}:{settings.SMTP_PORT}...")
-        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
+        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=30) as server:
             server.ehlo()
             logger.info("📡 Starting TLS...")
             server.starttls()
