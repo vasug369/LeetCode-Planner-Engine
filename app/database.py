@@ -59,13 +59,13 @@ def get_problem_count(db: Session) -> int:
 
 def get_unsolved_problems(db: Session) -> list[Problem]:
     """Get problems that haven't been solved yet."""
-    solved_ids = db.query(UserProgress.problem_id).filter(UserProgress.solved == True).subquery()
+    solved_ids = db.query(UserProgress.problem_id).filter(UserProgress.solved == True).scalar_subquery()
     return db.query(Problem).filter(~Problem.id.in_(solved_ids)).all()
 
 
 def get_solved_problems(db: Session) -> list[Problem]:
     """Get problems that are solved."""
-    solved_ids = db.query(UserProgress.problem_id).filter(UserProgress.solved == True).subquery()
+    solved_ids = db.query(UserProgress.problem_id).filter(UserProgress.solved == True).scalar_subquery()
     return db.query(Problem).filter(Problem.id.in_(solved_ids)).all()
 
 
