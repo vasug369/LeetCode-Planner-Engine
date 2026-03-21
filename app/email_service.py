@@ -1,7 +1,8 @@
-"""SMTP email service for sending daily problem plans."""
+"""SMTP/Resend email service for sending daily problem plans."""
 
 import smtplib
 import random
+import requests as http_requests
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import date
@@ -63,19 +64,67 @@ def _render_email(plan_summary: dict, solved: int, total: int, streak: int) -> s
     return html
 
 
+def _send_via_resend(subject: str, html_content: str, plain_text: str) -> dict:
+    """Send email via Resend HTTP API (works on Railway/platforms that block SMTP)."""
+    api_key = settings.RESEND_API_KEY
+    from_email = settings.RESEND_FROM or "LeetCode Planner <onboarding@resend.dev>"
+
+    logger.info(f"📧 Sending email via Resend API to {settings.EMAIL_TO}...")
+    resp = http_requests.post(
+        "https://api.resend.com/emails",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "from": from_email,
+            "to": [settings.EMAIL_TO],
+            "subject": subject,
+            "html": html_content,
+            "text": plain_text,
+        },
+        timeout=30,
+    )
+
+    if resp.status_code in (200, 201):
+        logger.info(f"✅ Email sent via Resend to {settings.EMAIL_TO}")
+        return {"status": "success", "message": f"Email sent via Resend to {settings.EMAIL_TO}"}
+    else:
+        error_msg = resp.text
+        logger.error(f"❌ Resend API error ({resp.status_code}): {error_msg}")
+        return {"status": "error", "message": f"Resend API error: {error_msg}"}
+
+
+def _send_via_smtp(subject: str, html_content: str, plain_text: str) -> dict:
+    """Send email via SMTP (for local dev or platforms that allow SMTP)."""
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = settings.SMTP_USER
+    msg["To"] = settings.EMAIL_TO
+
+    msg.attach(MIMEText(plain_text, "plain"))
+    msg.attach(MIMEText(html_content, "html"))
+
+    logger.info(f"📧 Attempting to connect to SMTP {settings.SMTP_HOST}:{settings.SMTP_PORT}...")
+    with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=30) as server:
+        server.ehlo()
+        logger.info("📡 Starting TLS...")
+        server.starttls()
+        server.ehlo()
+        logger.info(f"🔑 Logging in as {settings.SMTP_USER}...")
+        server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+        logger.info("📤 Sending mail content...")
+        server.sendmail(settings.SMTP_USER, settings.EMAIL_TO, msg.as_string())
+
+    logger.info(f"✅ Email sent via SMTP to {settings.EMAIL_TO}")
+    return {"status": "success", "message": f"Email sent via SMTP to {settings.EMAIL_TO}"}
+
+
 def send_daily_email(plan_summary: dict) -> dict:
     """
-    Send the daily problem plan via SMTP email.
-
-    Args:
-        plan_summary: Output from planner.get_plan_summary()
-
-    Returns:
-        dict with status and message.
+    Send the daily problem plan via email.
+    Uses Resend HTTP API if RESEND_API_KEY is set, otherwise falls back to SMTP.
     """
-    if not settings.SMTP_USER or not settings.SMTP_PASSWORD:
-        return {"status": "error", "message": "SMTP credentials not configured in .env"}
-
     if not settings.EMAIL_TO:
         return {"status": "error", "message": "EMAIL_TO not configured in .env"}
 
@@ -88,13 +137,9 @@ def send_daily_email(plan_summary: dict) -> dict:
         # Render email HTML
         html_content = _render_email(plan_summary, solved, total, streak)
 
-        # Build email message
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = f"📚 Your LeetCode Plan — {date.today().strftime('%b %d')} | {plan_summary['total_problems']} Problems"
-        msg["From"] = settings.SMTP_USER
-        msg["To"] = settings.EMAIL_TO
+        # Build subject and plain text
+        subject = f"📚 Your LeetCode Plan — {date.today().strftime('%b %d')} | {plan_summary['total_problems']} Problems"
 
-        # Plain text fallback
         plain_text = f"Daily LeetCode Plan - {date.today()}\n\n"
         for p in plan_summary["problems"]:
             plain_text += f"{p['number']}. [{p['difficulty']}] {p['title']} — {p['topic']}\n"
@@ -102,27 +147,17 @@ def send_daily_email(plan_summary: dict) -> dict:
             plain_text += f"   Expected: ~{p['expected_time']} min\n\n"
         plain_text += f"\nProgress: {solved}/{total} ({round((solved/total)*100, 1) if total else 0}%)\n"
 
-        msg.attach(MIMEText(plain_text, "plain"))
-        msg.attach(MIMEText(html_content, "html"))
-
-        # Send email
-        logger.info(f"📧 Attempting to connect to SMTP {settings.SMTP_HOST}:{settings.SMTP_PORT}...")
-        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=30) as server:
-            server.ehlo()
-            logger.info("📡 Starting TLS...")
-            server.starttls()
-            server.ehlo()
-            logger.info(f"🔑 Logging in as {settings.SMTP_USER}...")
-            server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-            logger.info("📤 Sending mail content...")
-            server.sendmail(settings.SMTP_USER, settings.EMAIL_TO, msg.as_string())
-
-        logger.info(f"✅ Email sent to {settings.EMAIL_TO}")
-        return {"status": "success", "message": f"Email sent to {settings.EMAIL_TO}"}
+        # Send via Resend (preferred) or SMTP (fallback)
+        if settings.RESEND_API_KEY:
+            return _send_via_resend(subject, html_content, plain_text)
+        elif settings.SMTP_USER and settings.SMTP_PASSWORD:
+            return _send_via_smtp(subject, html_content, plain_text)
+        else:
+            return {"status": "error", "message": "No email provider configured. Set RESEND_API_KEY or SMTP credentials."}
 
     except smtplib.SMTPAuthenticationError:
         logger.error("❌ SMTP authentication failed. Check your email/password in .env")
-        return {"status": "error", "message": "SMTP authentication failed. Check your email/password in .env"}
+        return {"status": "error", "message": "SMTP authentication failed."}
     except Exception as e:
         logger.error(f"❌ Failed to send email: {str(e)}")
         return {"status": "error", "message": f"Failed to send email: {str(e)}"}

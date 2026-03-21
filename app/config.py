@@ -28,6 +28,10 @@ class Settings:
     # Cloud Settings
     CRON_SECRET: str = os.getenv("CRON_SECRET", "change_me_in_production")
 
+    # Resend Email (HTTP-based, works on Railway/platforms that block SMTP)
+    RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "")
+    RESEND_FROM: str = os.getenv("RESEND_FROM", "LeetCode Planner <onboarding@resend.dev>")
+
     # Database
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./leetcode_planner.db")
 
