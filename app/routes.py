@@ -7,6 +7,7 @@ from datetime import date, datetime
 import os
 import logging
 import sys
+import time
 
 from app.database import (
     get_db, init_db, get_solved_count, get_problem_count,
@@ -28,13 +29,13 @@ templates = Jinja2Templates(directory=TEMPLATE_DIR)
 logger = logging.getLogger("uvicorn")
 
 
+# Overlap protection flags for cron endpoints
+_sync_running = False
+_daily_running = False
+
+
 def register_routes(app: FastAPI):
     """Register all API routes on the FastAPI app."""
-
-    @app.on_event("startup")
-    async def startup():
-        init_db()
-        load_sde_sheet()
 
     # ── Dashboard ────────────────────────────────────────────
 
@@ -218,9 +219,19 @@ def register_routes(app: FastAPI):
     @app.post("/api/cron/sync")
     @app.head("/api/cron/sync")
     async def cron_sync(request: Request, background_tasks: BackgroundTasks):
+        global _sync_running
+        t0 = time.time()
+        logger.info(f"🔔 [CRON HIT] /api/cron/sync at {datetime.now().isoformat()} from {request.client.host}")
+
         verify_cron_secret(request)
-        
+
+        if _sync_running:
+            logger.info("⏭️ [CRON] Sync already running — skipping duplicate.")
+            return JSONResponse(content={"ok": True, "skipped": True, "reason": "already running"}, status_code=200)
+
         def do_sync():
+            global _sync_running
+            _sync_running = True
             logger.info("🕒 [Cron] Starting background sync task...")
             db = get_db()
             try:
@@ -229,19 +240,31 @@ def register_routes(app: FastAPI):
             except Exception as e:
                 logger.error(f"❌ Error in background sync: {e}")
             finally:
+                _sync_running = False
                 db.close()
                 sys.stdout.flush()
 
         background_tasks.add_task(do_sync)
+        logger.info(f"✅ [CRON] /api/cron/sync responded 202 in {(time.time()-t0)*1000:.0f}ms")
         return JSONResponse(content={"ok": True}, status_code=202)
 
     @app.get("/api/cron/daily")
     @app.post("/api/cron/daily")
     @app.head("/api/cron/daily")
     async def cron_daily(request: Request, background_tasks: BackgroundTasks):
+        global _daily_running
+        t0 = time.time()
+        logger.info(f"🔔 [CRON HIT] /api/cron/daily at {datetime.now().isoformat()} from {request.client.host}")
+
         verify_cron_secret(request)
-        
+
+        if _daily_running:
+            logger.info("⏭️ [CRON] Daily job already running — skipping duplicate.")
+            return JSONResponse(content={"ok": True, "skipped": True, "reason": "already running"}, status_code=200)
+
         def do_daily_task():
+            global _daily_running
+            _daily_running = True
             logger.info("🕒 [Cron] Starting background daily planner task...")
             db = get_db()
             try:
@@ -257,8 +280,10 @@ def register_routes(app: FastAPI):
             except Exception as e:
                 logger.error(f"❌ Error in background daily task: {e}")
             finally:
+                _daily_running = False
                 db.close()
                 sys.stdout.flush()
 
         background_tasks.add_task(do_daily_task)
+        logger.info(f"✅ [CRON] /api/cron/daily responded 202 in {(time.time()-t0)*1000:.0f}ms")
         return JSONResponse(content={"ok": True}, status_code=202)
